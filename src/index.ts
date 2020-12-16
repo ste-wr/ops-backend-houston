@@ -2,13 +2,10 @@ import * as express from 'express'
 import * as session from 'express-session'
 import * as passport from 'passport'
 
+import DataStore from './controllers/dataStore'
 import DefaultRouter from './routes/DefaultRouter'
 import IndexRouter from './routes/IndexRouter'
 import AuthenticationRouter from './routes/AuthenticationRouter'
-
-const Settings = require('./settings')
-
-require('./controllers/auth')
 
 type sessionData = {
     secret: string,
@@ -20,7 +17,9 @@ type sessionData = {
 
 const init = async () => {
     const app = express()
-
+    const Settings = require('./settings')
+    const db = DataStore.initDataStore()
+    require('./controllers/auth')
     let sess: sessionData = {
         secret: 'keyboard cat',
         cookie: {
