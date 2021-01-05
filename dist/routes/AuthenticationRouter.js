@@ -7,12 +7,17 @@ var express_1 = require("express");
 var passport = require("passport");
 
 var router = express_1.Router();
-router.get('/auth/error', function (req, res) {
+router.route('/error').get(function (req, res) {
   res.status(401).send('Error');
 });
-router.get('/auth/github', passport.authenticate('github', {
+router.route('/logout').get(function (ctx) {
+  ctx.logout();
+  ctx.body = {};
+});
+router.route('/github').get(passport.authenticate('github', {
   scope: ['user:email']
-})).get('/auth/github/callback', passport.authenticate('github', {
+}));
+router.route('/github/callback').get(passport.authenticate('github', {
   successRedirect: '/',
   failureRedirect: '/auth/error'
 }));

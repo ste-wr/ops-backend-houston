@@ -2,12 +2,19 @@ import { Router } from 'express'
 import * as passport from 'passport'
 const router = Router()
 
-router.get('/auth/error', (req, res) => {
+
+router.route('/error').get((req, res) => {
     res.status(401).send('Error')
 })
 
-router.get('/auth/github', passport.authenticate('github', {scope: ['user:email']}))
-.get('/auth/github/callback', passport.authenticate('github', {
+router.route('/logout').get((ctx) => {
+    ctx.logout()
+    ctx.body = {}
+})
+
+router.route('/github').get(passport.authenticate('github', {scope: ['user:email']}))
+
+router.route('/github/callback').get(passport.authenticate('github', {
     successRedirect: '/',
     failureRedirect: '/auth/error'
 }))
