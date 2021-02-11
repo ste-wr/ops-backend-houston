@@ -2,6 +2,7 @@ require('dotenv').config({path: require('find-config')('.env')})
 
 import * as Koa from 'koa'
 import * as session from 'koa-session'
+import * as bodyParser from 'koa-bodyparser'
 import * as redisStore from 'koa-redis'
 import * as passport from 'koa-passport'
 
@@ -12,6 +13,7 @@ const app = new Koa()
 
 const init = async () => {
     db.init()
+    app.keys = [process.env.KOA_SESSION_SECRET];
     app.use(
         session(
             {
@@ -20,6 +22,21 @@ const init = async () => {
             app
         )
     )
+    app.use(async (ctx, next) => {
+        try {
+          await next();
+        } catch (error) {
+          ctx.status = error.status || 500;
+          ctx.type = 'json';
+          ctx.body = {
+            message: error.message,
+            type: error.type,
+          };
+          ctx.app.emit('error', error, ctx);
+        }
+    });
+    app.use(bodyParser())
+    require('./controllers/auth')
     app.use(passport.initialize())
     app.use(passport.session())
     app.use(authRoutes.routes())

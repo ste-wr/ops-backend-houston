@@ -4,20 +4,30 @@ import * as passport from 'koa-passport'
 // need to initialize the local auth strategy
 // in controllers/auth.ts
 
-const auth = require('../controllers/auth')
+//import * as auth from '../controllers/auth'
 
 const router = new Router({prefix: '/auth'})
 
 router
-    .get('/login', ctx => passport.authenticate('local', (err, user) => {
-        if(!user) {
-            ctx.throw(401, err)
-        } else {
-            ctx.body = user
-            return ctx.login(user)
-        }
-    })(ctx))
-
+    .post('/login', async (ctx, next) => {
+        return passport.authenticate('local', (err, user, info, status) => {
+            console.log(err)
+            console.log(user)
+            console.log(info)
+            console.log(status)
+            if(!user) {
+                ctx.throw(401, info)
+            } else {
+                ctx.body = user
+                return ctx.login(user)
+            }
+        })(ctx, next)
+    })
+    //.get('/users/profile', auth.getLoggedUser)
+    .get('/logout', (ctx) => {
+        ctx.logout();
+        ctx.body = {};
+    })
     /* Handle Oauth Login */
     //.get('/google', passport.authenticate('google'))
     //.get('/google/callback', passport.authenticate('google', {

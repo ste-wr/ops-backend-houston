@@ -151,6 +151,8 @@ var Koa = require("koa");
 
 var session = require("koa-session");
 
+var bodyParser = require("koa-bodyparser");
+
 var redisStore = require("koa-redis");
 
 var passport = require("koa-passport");
@@ -165,9 +167,54 @@ var init = function () {
   return __awaiter(void 0, void 0, void 0, function () {
     return __generator(this, function (_a) {
       db.init();
+      app.keys = [process.env.KOA_SESSION_SECRET];
       app.use(session({
         store: redisStore()
       }, app));
+      app.use(function (ctx, next) {
+        return __awaiter(void 0, void 0, void 0, function () {
+          var error_1;
+          return __generator(this, function (_a) {
+            switch (_a.label) {
+              case 0:
+                _a.trys.push([0, 2,, 3]);
+
+                return [4
+                /*yield*/
+                , next()];
+
+              case 1:
+                _a.sent();
+
+                return [3
+                /*break*/
+                , 3];
+
+              case 2:
+                error_1 = _a.sent();
+                ctx.status = error_1.status || 500;
+                ctx.type = 'json';
+                ctx.body = {
+                  message: error_1.message,
+                  type: error_1.type
+                };
+                ctx.app.emit('error', error_1, ctx);
+                return [3
+                /*break*/
+                , 3];
+
+              case 3:
+                return [2
+                /*return*/
+                ];
+            }
+          });
+        });
+      });
+      app.use(bodyParser());
+
+      require('./controllers/auth');
+
       app.use(passport.initialize());
       app.use(passport.session());
       app.use(auth_1["default"].routes());

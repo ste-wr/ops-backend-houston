@@ -142,6 +142,7 @@ var __generator = this && this.__generator || function (thisArg, body) {
 };
 
 exports.__esModule = true;
+exports.getLoggedUser = void 0;
 
 var passport = require("koa-passport");
 
@@ -205,7 +206,7 @@ passport.deserializeUser(function (id, done) {
 passport.use(new LocalStrategy({
   usernameField: 'email',
   passwordField: 'password'
-}, function (email, password, done) {
+}, function (username, password, done) {
   return __awaiter(void 0, void 0, void 0, function () {
     var user;
     return __generator(this, function (_a) {
@@ -217,7 +218,7 @@ passport.use(new LocalStrategy({
           , getAsync('usersMockDatabase').then(function (users) {
             var currUsers = JSON.parse(users);
             user = currUsers.find(function (currUser) {
-              return currUser.email === email;
+              return currUser.email === username;
             });
           })];
 
@@ -254,4 +255,53 @@ passport.use(new LocalStrategy({
     });
   });
 }));
+
+var getLoggedUser = function (ctx) {
+  return __awaiter(void 0, void 0, void 0, function () {
+    var reqUserId_1, user_2, statusCode;
+    return __generator(this, function (_a) {
+      switch (_a.label) {
+        case 0:
+          if (!ctx.isAuthenticated()) return [3
+          /*break*/
+          , 2];
+          reqUserId_1 = ctx.req.user.id;
+          user_2 = null;
+          return [4
+          /*yield*/
+          , getAsync('usersMockDatabase').then(function (users) {
+            user_2 = JSON.parse(users).find(function (currUser) {
+              return currUser.id === reqUserId_1;
+            });
+          })];
+
+        case 1:
+          _a.sent();
+
+          if (user_2) {
+            delete user_2.password;
+            ctx.response.body = user_2;
+          } else {
+            statusCode = 500;
+            ctx["throw"](statusCode, "User doesn't exist");
+          }
+
+          return [3
+          /*break*/
+          , 3];
+
+        case 2:
+          ctx.redirect('/');
+          _a.label = 3;
+
+        case 3:
+          return [2
+          /*return*/
+          ];
+      }
+    });
+  });
+};
+
+exports.getLoggedUser = getLoggedUser;
 //# sourceMappingURL=auth.js.map

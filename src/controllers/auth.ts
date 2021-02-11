@@ -35,11 +35,11 @@ passport.use(
             usernameField: 'email',
             passwordField: 'password'
         },
-        async (email, password, done) => {
+        async (username, password, done) => {
             let user = null
             await getAsync('usersMockDatabase').then((users) => {
                 const currUsers = JSON.parse(users)
-                user = currUsers.find(currUser => currUser.email === email)
+                user = currUsers.find(currUser => currUser.email === username)
             })
             if(!user) {
                 done({type: 'email', message: 'No such user found'}, false)
@@ -53,3 +53,26 @@ passport.use(
         }
     )
 )
+
+const getLoggedUser = async (ctx) => {
+    if(ctx.isAuthenticated()) {
+        const reqUserId = ctx.req.user.id
+        let user = null
+        await getAsync('usersMockDatabase').then((users) => {
+            user = JSON.parse(users).find(currUser => currUser.id === reqUserId)
+        })
+        if(user) {
+            delete user.password
+            ctx.response.body = user
+        } else {
+            const statusCode = 500
+            ctx.throw(statusCode, "User doesn't exist")
+        }
+    } else {
+        ctx.redirect('/')
+    }
+}
+
+export {
+    getLoggedUser
+}
