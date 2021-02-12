@@ -203,10 +203,7 @@ passport.deserializeUser(function (id, done) {
     });
   });
 });
-passport.use(new LocalStrategy({
-  usernameField: 'email',
-  passwordField: 'password'
-}, function (username, password, done) {
+passport.use(new LocalStrategy(function (username, password, done) {
   return __awaiter(void 0, void 0, void 0, function () {
     var user;
     return __generator(this, function (_a) {

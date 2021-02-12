@@ -4,6 +4,7 @@ import * as Koa from 'koa'
 import * as session from 'koa-session'
 import * as bodyParser from 'koa-bodyparser'
 import * as redisStore from 'koa-redis'
+import * as cors from '@koa/cors'
 import * as passport from 'koa-passport'
 
 import * as db from './models'
@@ -22,6 +23,10 @@ const init = async () => {
             app
         )
     )
+    const corsOptions = {
+        credentials: true
+    }
+    app.use(cors(corsOptions))
     app.use(async (ctx, next) => {
         try {
           await next();

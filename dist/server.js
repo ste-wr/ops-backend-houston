@@ -155,6 +155,8 @@ var bodyParser = require("koa-bodyparser");
 
 var redisStore = require("koa-redis");
 
+var cors = require("@koa/cors");
+
 var passport = require("koa-passport");
 
 var db = require("./models");
@@ -165,12 +167,17 @@ var app = new Koa();
 
 var init = function () {
   return __awaiter(void 0, void 0, void 0, function () {
+    var corsOptions;
     return __generator(this, function (_a) {
       db.init();
       app.keys = [process.env.KOA_SESSION_SECRET];
       app.use(session({
         store: redisStore()
       }, app));
+      corsOptions = {
+        credentials: true
+      };
+      app.use(cors(corsOptions));
       app.use(function (ctx, next) {
         return __awaiter(void 0, void 0, void 0, function () {
           var error_1;

@@ -31,10 +31,6 @@ passport.deserializeUser(async (id, done) => {
 
 passport.use(
     new LocalStrategy(
-        {
-            usernameField: 'email',
-            passwordField: 'password'
-        },
         async (username, password, done) => {
             let user = null
             await getAsync('usersMockDatabase').then((users) => {
