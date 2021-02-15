@@ -11,12 +11,16 @@ const router = new Router({prefix: '/auth'})
 router
     .post('/login', async (ctx, next) => {
         return passport.authenticate('local', (err, user, info, status) => {
-            console.log("err", err)
-            console.log("user", user)
-            console.log("info", info)
-            console.log("status", status)
             if(!user) {
-                ctx.throw(401, info)
+                if(err) {
+                    ctx.throw(500, err)
+                } else {
+                    if(status) {
+                        ctx.throw(status, info)
+                    } else {
+                        ctx.throw(400, info)
+                    }
+                }
             } else {
                 ctx.body = user
                 return ctx.login(user)
