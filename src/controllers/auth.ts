@@ -64,8 +64,8 @@ const authenticateUserToken = async (payload) => {
     // some documentation:
     // if we assume that this is the first time we receive the authentication, we will have both the 
     // access token and the refresh token.  We then need to do two things:
-    // 1.  encode the tokens in separate JWT objects - send to client and encode in HTTP-only cookies
-    // 2.  Put the refresh token in the database (not the access token)
+    // 1.  encode the tokens in separate JWT objects - send the access token to client and encode in HTTP-only cookie
+    // 2.  Put the refresh in the database (not the access token)
     const usr_info = await oauth2.userinfo.get(
         (err, res) => {
             if(err) {
