@@ -150,13 +150,15 @@ var bcrypt = require("bcrypt");
 
 var util_1 = require("util");
 
-var google_auth_library_1 = require("google-auth-library");
+var google = require('googleapis').google;
 
-var client = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
+var client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
+var oauth2 = google.oauth2({
+  auth: client,
+  version: 'v2'
+});
 
 var LocalStrategy = require('passport-local').Strategy;
-
-var GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 var models_1 = require("../models");
 
@@ -258,38 +260,34 @@ passport.use(new LocalStrategy(function (username, password, done) {
     });
   });
 }));
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: process.env.GOOGLE_CALLBACK_URL,
-  proxy: true
-}, function (accessToken, refreshToken, profile, cb) {
-  console.log(accessToken);
-  console.log(refreshToken);
-  console.log(profile);
-  return cb(null, profile);
-}));
 
 var authenticateUserToken = function (payload) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var ticket;
+    var tokens, usr_info;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
           return [4
           /*yield*/
-          , client.getToken(payload.code).then(function (data) {
-            console.log(data);
-          })["catch"](function (err) {
-            console.log(err);
-          })];
+          , client.getToken(payload.code)];
 
         case 1:
-          ticket = _a.sent();
-          console.log(ticket);
+          tokens = _a.sent().tokens;
+          client.setCredentials(tokens);
+          console.log(tokens);
+          return [4
+          /*yield*/
+          , oauth2.userinfo.get(function (err, res) {
+            if (err) {
+              console.log(err);
+            }
+          })];
+
+        case 2:
+          usr_info = _a.sent();
           return [2
           /*return*/
-          ];
+          , usr_info];
       }
     });
   });

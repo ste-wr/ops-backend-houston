@@ -1,13 +1,16 @@
 import * as passport from 'koa-passport'
 import * as bcrypt from 'bcrypt'
 import { promisify } from 'util'
-import { OAuth2Client } from 'google-auth-library'
+const google = require('googleapis').google
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage')
+const client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage')
+var oauth2 = google.oauth2({
+    auth: client,
+    version: 'v2'
+})
 
 
 const LocalStrategy = require('passport-local').Strategy
-const GoogleStrategy = require('passport-google-oauth20').Strategy
 
 import { db } from '../models'
 
@@ -54,29 +57,23 @@ passport.use(
     )
 )
 
-passport.use(
-    new GoogleStrategy({
-        clientID: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: process.env.GOOGLE_CALLBACK_URL,
-        proxy:true
-    },
-    function(accessToken, refreshToken, profile, cb) {
-        console.log(accessToken)
-        console.log(refreshToken)
-        console.log(profile)
-        return cb(null, profile)
-    })
-)
 
 const authenticateUserToken = async (payload) => {
-    await client.getToken(payload.code)
-    .then(data => {
-        //we have access and ID token
-    })
-    .catch(err => {
-        console.log(err)
-    })
+    const {tokens} = await client.getToken(payload.code)
+    client.setCredentials(tokens)
+    // some documentation:
+    // if we assume that this is the first time we receive the authentication, we will have both the 
+    // access token and the refresh token.  We then need to do two things:
+    // 1.  encode the tokens in separate JWT objects - send to client and encode in HTTP-only cookies
+    // 2.  Put the refresh token in the database (not the access token)
+    const usr_info = await oauth2.userinfo.get(
+        (err, res) => {
+            if(err) {
+                console.log(err)
+            }
+        }
+    )
+    return usr_info
 }
 
 const getLoggedUser = async (ctx) => {
