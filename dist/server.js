@@ -175,7 +175,8 @@ var init = function () {
         store: redisStore()
       }, app));
       corsOptions = {
-        credentials: true
+        credentials: true,
+        origin: "http://localhost:3000"
       };
       app.use(cors(corsOptions));
       app.use(function (ctx, next) {

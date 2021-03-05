@@ -142,7 +142,7 @@ var __generator = this && this.__generator || function (thisArg, body) {
 };
 
 exports.__esModule = true;
-exports.getLoggedUser = void 0;
+exports.authenticateUserToken = exports.getLoggedUser = void 0;
 
 var passport = require("koa-passport");
 
@@ -150,7 +150,13 @@ var bcrypt = require("bcrypt");
 
 var util_1 = require("util");
 
+var google_auth_library_1 = require("google-auth-library");
+
+var client = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
+
 var LocalStrategy = require('passport-local').Strategy;
+
+var GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 var models_1 = require("../models");
 
@@ -252,6 +258,44 @@ passport.use(new LocalStrategy(function (username, password, done) {
     });
   });
 }));
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: process.env.GOOGLE_CALLBACK_URL,
+  proxy: true
+}, function (accessToken, refreshToken, profile, cb) {
+  console.log(accessToken);
+  console.log(refreshToken);
+  console.log(profile);
+  return cb(null, profile);
+}));
+
+var authenticateUserToken = function (payload) {
+  return __awaiter(void 0, void 0, void 0, function () {
+    var ticket;
+    return __generator(this, function (_a) {
+      switch (_a.label) {
+        case 0:
+          return [4
+          /*yield*/
+          , client.getToken(payload.code).then(function (data) {
+            console.log(data);
+          })["catch"](function (err) {
+            console.log(err);
+          })];
+
+        case 1:
+          ticket = _a.sent();
+          console.log(ticket);
+          return [2
+          /*return*/
+          ];
+      }
+    });
+  });
+};
+
+exports.authenticateUserToken = authenticateUserToken;
 
 var getLoggedUser = function (ctx) {
   return __awaiter(void 0, void 0, void 0, function () {

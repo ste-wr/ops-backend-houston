@@ -147,8 +147,9 @@ var Router = require("@koa/router");
 
 var passport = require("koa-passport"); // need to initialize the local auth strategy
 // in controllers/auth.ts
-//import * as auth from '../controllers/auth'
 
+
+var auth_1 = require("../controllers/auth");
 
 var router = new Router({
   prefix: '/auth'
@@ -180,13 +181,30 @@ router.post('/login', function (ctx, next) {
 .get('/logout', function (ctx) {
   ctx.logout();
   ctx.body = {};
-});
+})
 /* Handle Oauth Login */
-//.get('/google', passport.authenticate('google'))
-//.get('/google/callback', passport.authenticate('google', {
-//    successRedirect: '/google/success/',
-//    failureRedirect: '/'
-//}))
+.post('/google', function (ctx, next) {
+  return __awaiter(void 0, void 0, void 0, function () {
+    var resp;
+    return __generator(this, function (_a) {
+      switch (_a.label) {
+        case 0:
+          return [4
+          /*yield*/
+          , auth_1.authenticateUserToken(ctx.request.body)];
 
+        case 1:
+          resp = _a.sent();
+          ctx.body = resp;
+          return [2
+          /*return*/
+          , ctx];
+      }
+    });
+  });
+}).get('/google/callback', passport.authenticate('google', {
+  successRedirect: '/',
+  failureRedirect: '/failed'
+}));
 exports["default"] = router;
 //# sourceMappingURL=auth.js.map
