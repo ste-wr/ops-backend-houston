@@ -2,6 +2,7 @@ import * as passport from 'koa-passport'
 import * as bcrypt from 'bcrypt'
 import { promisify } from 'util'
 const google = require('googleapis').google
+const jwt = require('jsonwebtoken')
 
 const client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage')
 var oauth2 = google.oauth2({
@@ -57,15 +58,38 @@ passport.use(
     )
 )
 
+const hashAndCreateJWT = (access_token) => {
+    bcrypt.genSalt(10, (err, salt) => {
+        if(err) {
+            console.log(err)
+        } else {
+            bcrypt.hash(access_token, salt, (err, hash) => {
+                if(err) {
+                    console.log(err)
+                } else {
+                    console.log(hash)
+                    return jwt.sign({access_token: hash}, process.env.JWT_SALT, {expiresIn: '3600s'})
+                }
+            })
+        }
+    })
+}
+
 
 const authenticateUserToken = async (payload) => {
     const {tokens} = await client.getToken(payload.code)
     client.setCredentials(tokens)
+    const jwtObject = hashAndCreateJWT(tokens.access_token)
+    if(tokens.refresh_token) {
+        const refresh_token = tokens.refresh_token
+    } else {
+        console.log("no refresh token in response object")
+    }
     // some documentation:
     // if we assume that this is the first time we receive the authentication, we will have both the 
     // access token and the refresh token.  We then need to do two things:
-    // 1.  encode the tokens in separate JWT objects - send the access token to client and encode in HTTP-only cookie
-    // 2.  Put the refresh in the database (not the access token)
+    // 1.  encode the access_token into a JWT object - send both the access token and a hashed version of the refresh token to the client as separate httpOnly cookies
+    // 2.  Put both tokens in the database
     const usr_info = await oauth2.userinfo.get(
         (err, res) => {
             if(err) {

@@ -152,6 +152,8 @@ var util_1 = require("util");
 
 var google = require('googleapis').google;
 
+var jwt = require('jsonwebtoken');
+
 var client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
 var oauth2 = google.oauth2({
   auth: client,
@@ -261,9 +263,30 @@ passport.use(new LocalStrategy(function (username, password, done) {
   });
 }));
 
+var hashAndCreateJWT = function (access_token) {
+  bcrypt.genSalt(10, function (err, salt) {
+    if (err) {
+      console.log(err);
+    } else {
+      bcrypt.hash(access_token, salt, function (err, hash) {
+        if (err) {
+          console.log(err);
+        } else {
+          console.log(hash);
+          return jwt.sign({
+            access_token: hash
+          }, process.env.JWT_SALT, {
+            expiresIn: '3600s'
+          });
+        }
+      });
+    }
+  });
+};
+
 var authenticateUserToken = function (payload) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var tokens, usr_info;
+    var tokens, jwtObject, refresh_token, usr_info;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
@@ -274,7 +297,14 @@ var authenticateUserToken = function (payload) {
         case 1:
           tokens = _a.sent().tokens;
           client.setCredentials(tokens);
-          console.log(tokens);
+          jwtObject = hashAndCreateJWT(tokens.access_token);
+
+          if (tokens.refresh_token) {
+            refresh_token = tokens.refresh_token;
+          } else {
+            console.log("no refresh token in response object");
+          }
+
           return [4
           /*yield*/
           , oauth2.userinfo.get(function (err, res) {
