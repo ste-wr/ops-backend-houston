@@ -154,6 +154,8 @@ var google = require('googleapis').google;
 
 var jwt = require('jsonwebtoken');
 
+var uuid_1 = require("uuid");
+
 var client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
 var oauth2 = google.oauth2({
   auth: client,
@@ -165,6 +167,8 @@ var LocalStrategy = require('passport-local').Strategy;
 var models_1 = require("../models");
 
 var getAsync = util_1.promisify(models_1.db.get).bind(models_1.db);
+var hmsetAsync = util_1.promisify(models_1.db.hmset).bind(models_1.db);
+var setAsync = util_1.promisify(models_1.db.set).bind(models_1.db);
 passport.serializeUser(function (user, done) {
   done(null, user.id);
 });
@@ -263,30 +267,9 @@ passport.use(new LocalStrategy(function (username, password, done) {
   });
 }));
 
-var hashAndCreateJWT = function (access_token) {
-  bcrypt.genSalt(10, function (err, salt) {
-    if (err) {
-      console.log(err);
-    } else {
-      bcrypt.hash(access_token, salt, function (err, hash) {
-        if (err) {
-          console.log(err);
-        } else {
-          console.log(hash);
-          return jwt.sign({
-            access_token: hash
-          }, process.env.JWT_SALT, {
-            expiresIn: '3600s'
-          });
-        }
-      });
-    }
-  });
-};
-
 var authenticateUserToken = function (payload) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var tokens, jwtObject, refresh_token, usr_info;
+    var tokens, userData, user_2;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
@@ -297,27 +280,64 @@ var authenticateUserToken = function (payload) {
         case 1:
           tokens = _a.sent().tokens;
           client.setCredentials(tokens);
-          jwtObject = hashAndCreateJWT(tokens.access_token);
-
-          if (tokens.refresh_token) {
-            refresh_token = tokens.refresh_token;
-          } else {
-            console.log("no refresh token in response object");
-          }
-
           return [4
           /*yield*/
-          , oauth2.userinfo.get(function (err, res) {
-            if (err) {
-              console.log(err);
-            }
-          })];
+          , oauth2.userinfo.get()];
 
         case 2:
-          usr_info = _a.sent();
+          userData = _a.sent();
+          if (!userData.data.id) return [3
+          /*break*/
+          , 4];
+          user_2 = null;
+          return [4
+          /*yield*/
+          , getAsync('user').then(function (data) {
+            var users = [];
+            var uuid = uuid_1.v4();
+
+            if (data) {
+              users = JSON.parse(data);
+              user_2 = users.find(function (u) {
+                return u.google_id == userData.data.id;
+              });
+            }
+
+            if (!user_2) {
+              //user not found in db = add it
+              users.push({
+                id: uuid,
+                google_id: userData.data.id
+              });
+              models_1.db.set('user', JSON.stringify(users));
+              user_2 = {
+                id: uuid,
+                google_id: userData.data.id
+              };
+            }
+          })["catch"](function (err) {
+            console.log('no user table: ', err);
+          })];
+
+        case 3:
+          _a.sent();
+
           return [2
           /*return*/
-          , usr_info];
+          , JSON.stringify({
+            id: user_2.id,
+            access_token: jwt.sign({
+              access_token: bcrypt.hashSync(tokens.access_token, 10)
+            }, process.env.JWT_SALT, {
+              expiresIn: '3600s'
+            }),
+            refresh_token: tokens.refresh_token ? bcrypt.hashSync(tokens.refresh_token, 10) : ''
+          })];
+
+        case 4:
+          return [2
+          /*return*/
+          ];
       }
     });
   });
@@ -327,7 +347,7 @@ exports.authenticateUserToken = authenticateUserToken;
 
 var getLoggedUser = function (ctx) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var reqUserId_1, user_2, statusCode;
+    var reqUserId_1, user_3, statusCode;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
@@ -335,11 +355,11 @@ var getLoggedUser = function (ctx) {
           /*break*/
           , 2];
           reqUserId_1 = ctx.req.user.id;
-          user_2 = null;
+          user_3 = null;
           return [4
           /*yield*/
           , getAsync('usersMockDatabase').then(function (users) {
-            user_2 = JSON.parse(users).find(function (currUser) {
+            user_3 = JSON.parse(users).find(function (currUser) {
               return currUser.id === reqUserId_1;
             });
           })];
@@ -347,9 +367,9 @@ var getLoggedUser = function (ctx) {
         case 1:
           _a.sent();
 
-          if (user_2) {
-            delete user_2.password;
-            ctx.response.body = user_2;
+          if (user_3) {
+            delete user_3.password;
+            ctx.response.body = user_3;
           } else {
             statusCode = 500;
             ctx["throw"](statusCode, "User doesn't exist");

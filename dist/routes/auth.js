@@ -185,20 +185,31 @@ router.post('/login', function (ctx, next) {
 /* Handle Oauth Login */
 .post('/google', function (ctx, next) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var resp;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
           return [4
           /*yield*/
-          , auth_1.authenticateUserToken(ctx.request.body)];
+          , auth_1.authenticateUserToken(ctx.request.body).then(function (res) {
+            var tokenData = JSON.parse(res);
+
+            if (tokenData.refresh_token !== '') {
+              ctx.set('Set-Cookie', ["__hstn_access_token=" + tokenData.access_token + "; HttpOnly", "__hstn_refresh_token=" + tokenData.refresh_token + "; HttpOnly", "__hstn_id=" + tokenData.id]);
+            } else {
+              ctx.set('Set-Cookie', ["__hstn_access_token=" + tokenData.access_token + "; HttpOnly", "__hstn_id=" + tokenData.id]);
+            }
+
+            ctx.status = 200;
+            ctx.body = 'accepted';
+            return ctx;
+          })];
 
         case 1:
-          resp = _a.sent();
-          ctx.body = resp;
+          _a.sent();
+
           return [2
           /*return*/
-          , ctx];
+          ];
       }
     });
   });

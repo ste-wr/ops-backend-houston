@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt'
 import { promisify } from 'util'
 const google = require('googleapis').google
 const jwt = require('jsonwebtoken')
+import { v4 as uuidv4 } from 'uuid'
 
 const client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage')
 var oauth2 = google.oauth2({
@@ -14,8 +15,12 @@ var oauth2 = google.oauth2({
 const LocalStrategy = require('passport-local').Strategy
 
 import { db } from '../models'
+import { resolve } from 'path'
+import { rejects } from 'assert'
 
 const getAsync = promisify(db.get).bind(db)
+const hmsetAsync = promisify(db.hmset).bind(db)
+const setAsync = promisify(db.set).bind(db)
 
 passport.serializeUser((user, done) => {
     done(null, user.id)
@@ -58,46 +63,46 @@ passport.use(
     )
 )
 
-const hashAndCreateJWT = (access_token) => {
-    bcrypt.genSalt(10, (err, salt) => {
-        if(err) {
-            console.log(err)
-        } else {
-            bcrypt.hash(access_token, salt, (err, hash) => {
-                if(err) {
-                    console.log(err)
-                } else {
-                    console.log(hash)
-                    return jwt.sign({access_token: hash}, process.env.JWT_SALT, {expiresIn: '3600s'})
-                }
-            })
-        }
-    })
-}
-
 
 const authenticateUserToken = async (payload) => {
     const {tokens} = await client.getToken(payload.code)
     client.setCredentials(tokens)
-    const jwtObject = hashAndCreateJWT(tokens.access_token)
-    if(tokens.refresh_token) {
-        const refresh_token = tokens.refresh_token
-    } else {
-        console.log("no refresh token in response object")
-    }
     // some documentation:
     // if we assume that this is the first time we receive the authentication, we will have both the 
     // access token and the refresh token.  We then need to do two things:
     // 1.  encode the access_token into a JWT object - send both the access token and a hashed version of the refresh token to the client as separate httpOnly cookies
     // 2.  Put both tokens in the database
-    const usr_info = await oauth2.userinfo.get(
-        (err, res) => {
-            if(err) {
-                console.log(err)
+    const userData = await oauth2.userinfo.get()
+    if(userData.data.id) {
+        let user = null
+        await getAsync('user').then((data) => {
+            let users = []
+            const uuid = uuidv4()
+            if(data) {
+                users = JSON.parse(data)
+                user = users.find(u => u.google_id == userData.data.id)
             }
-        }
-    )
-    return usr_info
+            if(!user) {
+                //user not found in db = add it
+                users.push({
+                    id: uuid,
+                    google_id: userData.data.id
+                })
+                db.set('user', JSON.stringify(users))
+                user = {
+                    id: uuid,
+                    google_id: userData.data.id,
+                }
+            }
+        }).catch((err) => {
+            console.log('no user table: ',err)
+        })
+        return JSON.stringify({
+            id: user.id,
+            access_token: jwt.sign({access_token: bcrypt.hashSync(tokens.access_token, 10)}, process.env.JWT_SALT, {expiresIn: '3600s'}),
+            refresh_token: tokens.refresh_token ? bcrypt.hashSync(tokens.refresh_token, 10) : ''
+        })
+    }
 }
 
 const getLoggedUser = async (ctx) => {
