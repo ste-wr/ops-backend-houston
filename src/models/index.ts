@@ -1,20 +1,56 @@
-import * as redis from 'redis'
+import * as sqlite from 'sqlite3'
 
-const db = redis.createClient()
+let db = new sqlite.Database('config.db', (err) => {
+    if(err) {
+        console.error(err.message)
+    }
+    console.log('connected to database')
+})
 
 db.on('error', (err) => {
     console.log(`DB error ${err}`)
 })
 
 const init = () => {
-    db.set('usersMockDatabase', JSON.stringify([
-        {
-            id: 1,
-            email: 'root@houston.ops',
-            password: '$2a$04$4yQfCo8kMpH24T2iQkw9p.hPjcz10m.FcWmgkOhkXNPSpbwHZ877S',
-            userName: 'root'
-        }
-    ]), redis.print)
+    db.parallelize(() => {
+        db.run(`CREATE TABLE user (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            google_id text, 
+            CONSTRAINT google_id_unique UNIQUE (google_id)
+            )`,
+        (err) => {
+            if (err) {
+                // Table already created
+            }else{
+                console.log('table USER created')
+            }
+        });
+        db.run(`CREATE TABLE oauth_access_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, 
+            access_token TEXT,
+            expiry_date INTEGER
+            )`,
+        (err) => {
+            if (err) {
+                // Table already created
+            }else{
+                console.log('table oauth_access_tokens created')
+            }
+        });
+        db.run(`CREATE TABLE oauth_refresh_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            refresh_token TEXT
+            )`,
+        (err) => {
+            if (err) {
+                // Table already created
+            }else{
+                console.log('table oauth_refresh_tokens created')
+            }
+        });
+    })
 }
 
 export {

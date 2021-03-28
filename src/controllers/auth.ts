@@ -1,70 +1,79 @@
 import * as passport from 'koa-passport'
 import * as bcrypt from 'bcrypt'
-import { promisify } from 'util'
 const google = require('googleapis').google
 const jwt = require('jsonwebtoken')
-import { v4 as uuidv4 } from 'uuid'
+import { db } from '../models'
 
 const client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage')
-var oauth2 = google.oauth2({
+const oauth2 = google.oauth2({
     auth: client,
     version: 'v2'
 })
 
-
-const LocalStrategy = require('passport-local').Strategy
-
-import { db } from '../models'
-import { resolve } from 'path'
-import { rejects } from 'assert'
-
-const getAsync = promisify(db.get).bind(db)
-const hmsetAsync = promisify(db.hmset).bind(db)
-const setAsync = promisify(db.set).bind(db)
+type hstnUser = {
+    id: number,
+    google_id: string
+}
 
 passport.serializeUser((user, done) => {
     done(null, user.id)
 })
 
-passport.deserializeUser(async (id, done) => {
-    try {
-        let user = null
-        await getAsync('usersMockDatabase').then((users) => {
-            user = JSON.parse(users).find(currUser => currUser.id === id)
-        })
-        if(user) {
-            done(null, user)
-        } else {
-            done(null, false)
-        }
-    } catch (err) {
-        done(err)
-    }
-})
-
-passport.use(
-    new LocalStrategy(
-        async (username, password, done) => {
-            let user = null
-            await getAsync('usersMockDatabase').then((users) => {
-                const currUsers = JSON.parse(users)
-                user = currUsers.find(currUser => currUser.email === username)
+const getOrInsertUser = (id: string) => {
+    return new Promise((resolve, reject) => {
+        let user: hstnUser = null
+        db.serialize(() => {
+            db.get("SELECT * FROM user where google_id = ?", id, (err, row) => {
+                if (err) {
+                    // database error
+                    console.error(err)
+                    reject(err)
+                } else {
+                    if (!row) {
+                        db.run(`INSERT INTO user(google_id) VALUES(?)`, [id], function(this: any, err: any) {
+                            if(err) {
+                                console.error(err)
+                            }
+                            user = {
+                                id: this.lastID,
+                                google_id: id,
+                            }
+                            resolve(user)
+                        })
+                    } else {
+                        user = {
+                            id: row.id,
+                            google_id: id,
+                        }
+                        resolve(user)
+                    }
+                }
             })
-            if(!user) {
-                done({type: 'email', message: 'No such user found'}, false)
-                return
-            }
-            if(bcrypt.compareSync(password, user.password)) {
-                done(null, { id: user.id, email: user.email, userName: user.userName})
-            } else {
-                done({type: 'password', message: 'Passwords did not match'}, false)
-            }
-        }
-    )
-)
+        })
+    })
+}
 
+const insertUserAccessToken = (user_id, token, expiry) => {
+    const epoch_expiry = expiry / 1000
+    db.run(`INSERT INTO oauth_access_tokens(user_id, access_token, expiry_date) VALUES(?,?,?)`, [user_id, token, epoch_expiry], function(this: any, err: any) {
+        if(err) {
+            console.error(err)
+        }
+        console.log(`Inserted access token with lastID ${this.lastID}`)
+    })
+}
+
+const insertUserRefreshToken = (user_id, token) => {
+    db.run(`INSERT INTO oauth_refresh_tokens(user_id, refresh_token) VALUES(?,?)`, [user_id, token], function(this: any, err: any) {
+        if(err) {
+            console.error(err)
+        }
+        console.log(`Inserted refresh token with lastID ${this.lastID}`)
+    })
+}
 
 const authenticateUserToken = async (payload) => {
+    let data = null
     const {tokens} = await client.getToken(payload.code)
     client.setCredentials(tokens)
     // some documentation:
@@ -74,57 +83,25 @@ const authenticateUserToken = async (payload) => {
     // 2.  Put both tokens in the database
     const userData = await oauth2.userinfo.get()
     if(userData.data.id) {
-        let user = null
-        await getAsync('user').then((data) => {
-            let users = []
-            const uuid = uuidv4()
-            if(data) {
-                users = JSON.parse(data)
-                user = users.find(u => u.google_id == userData.data.id)
+        await getOrInsertUser(userData.data.id).then((user: any) => {
+            const hashedAccessToken = bcrypt.hashSync(tokens.access_token, 10)
+            insertUserAccessToken(user.id, hashedAccessToken, tokens.expiry_date)
+            let hashedRefreshToken = ""
+            if(tokens.refresh_token) {
+                hashedRefreshToken = bcrypt.hashSync(tokens.refresh_token, 10)
+                insertUserRefreshToken(user.id, hashedRefreshToken)
             }
-            if(!user) {
-                //user not found in db = add it
-                users.push({
-                    id: uuid,
-                    google_id: userData.data.id
-                })
-                db.set('user', JSON.stringify(users))
-                user = {
-                    id: uuid,
-                    google_id: userData.data.id,
-                }
-            }
-        }).catch((err) => {
-            console.log('no user table: ',err)
+            data = JSON.stringify({
+                access_token: jwt.sign({access_token: hashedAccessToken}, process.env.JWT_SALT, {expiresIn: '3600s'}),
+                refresh_token: hashedRefreshToken
+            })
         })
-        return JSON.stringify({
-            id: user.id,
-            access_token: jwt.sign({access_token: bcrypt.hashSync(tokens.access_token, 10)}, process.env.JWT_SALT, {expiresIn: '3600s'}),
-            refresh_token: tokens.refresh_token ? bcrypt.hashSync(tokens.refresh_token, 10) : ''
-        })
-    }
-}
-
-const getLoggedUser = async (ctx) => {
-    if(ctx.isAuthenticated()) {
-        const reqUserId = ctx.req.user.id
-        let user = null
-        await getAsync('usersMockDatabase').then((users) => {
-            user = JSON.parse(users).find(currUser => currUser.id === reqUserId)
-        })
-        if(user) {
-            delete user.password
-            ctx.response.body = user
-        } else {
-            const statusCode = 500
-            ctx.throw(statusCode, "User doesn't exist")
-        }
     } else {
-        ctx.redirect('/')
+        return null
     }
+    return data
 }
 
 export {
-    getLoggedUser,
     authenticateUserToken
 }

@@ -142,137 +142,90 @@ var __generator = this && this.__generator || function (thisArg, body) {
 };
 
 exports.__esModule = true;
-exports.authenticateUserToken = exports.getLoggedUser = void 0;
+exports.authenticateUserToken = void 0;
 
 var passport = require("koa-passport");
 
 var bcrypt = require("bcrypt");
 
-var util_1 = require("util");
-
 var google = require('googleapis').google;
 
 var jwt = require('jsonwebtoken');
 
-var uuid_1 = require("uuid");
+var models_1 = require("../models");
 
 var client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
 var oauth2 = google.oauth2({
   auth: client,
   version: 'v2'
 });
-
-var LocalStrategy = require('passport-local').Strategy;
-
-var models_1 = require("../models");
-
-var getAsync = util_1.promisify(models_1.db.get).bind(models_1.db);
-var hmsetAsync = util_1.promisify(models_1.db.hmset).bind(models_1.db);
-var setAsync = util_1.promisify(models_1.db.set).bind(models_1.db);
 passport.serializeUser(function (user, done) {
   done(null, user.id);
 });
-passport.deserializeUser(function (id, done) {
-  return __awaiter(void 0, void 0, void 0, function () {
-    var user_1, err_1;
-    return __generator(this, function (_a) {
-      switch (_a.label) {
-        case 0:
-          _a.trys.push([0, 2,, 3]);
 
-          user_1 = null;
-          return [4
-          /*yield*/
-          , getAsync('usersMockDatabase').then(function (users) {
-            user_1 = JSON.parse(users).find(function (currUser) {
-              return currUser.id === id;
-            });
-          })];
+var getOrInsertUser = function (id) {
+  return new Promise(function (resolve, reject) {
+    var user = null;
+    models_1.db.serialize(function () {
+      models_1.db.get("SELECT * FROM user where google_id = ?", id, function (err, row) {
+        if (err) {
+          // database error
+          console.error(err);
+          reject(err);
+        } else {
+          if (!row) {
+            models_1.db.run("INSERT INTO user(google_id) VALUES(?)", [id], function (err) {
+              if (err) {
+                console.error(err);
+              }
 
-        case 1:
-          _a.sent();
-
-          if (user_1) {
-            done(null, user_1);
-          } else {
-            done(null, false);
-          }
-
-          return [3
-          /*break*/
-          , 3];
-
-        case 2:
-          err_1 = _a.sent();
-          done(err_1);
-          return [3
-          /*break*/
-          , 3];
-
-        case 3:
-          return [2
-          /*return*/
-          ];
-      }
-    });
-  });
-});
-passport.use(new LocalStrategy(function (username, password, done) {
-  return __awaiter(void 0, void 0, void 0, function () {
-    var user;
-    return __generator(this, function (_a) {
-      switch (_a.label) {
-        case 0:
-          user = null;
-          return [4
-          /*yield*/
-          , getAsync('usersMockDatabase').then(function (users) {
-            var currUsers = JSON.parse(users);
-            user = currUsers.find(function (currUser) {
-              return currUser.email === username;
-            });
-          })];
-
-        case 1:
-          _a.sent();
-
-          if (!user) {
-            done({
-              type: 'email',
-              message: 'No such user found'
-            }, false);
-            return [2
-            /*return*/
-            ];
-          }
-
-          if (bcrypt.compareSync(password, user.password)) {
-            done(null, {
-              id: user.id,
-              email: user.email,
-              userName: user.userName
+              user = {
+                id: this.lastID,
+                google_id: id
+              };
+              resolve(user);
             });
           } else {
-            done({
-              type: 'password',
-              message: 'Passwords did not match'
-            }, false);
+            user = {
+              id: row.id,
+              google_id: id
+            };
+            resolve(user);
           }
-
-          return [2
-          /*return*/
-          ];
-      }
+        }
+      });
     });
   });
-}));
+};
+
+var insertUserAccessToken = function (user_id, token, expiry) {
+  var epoch_expiry = expiry / 1000;
+  models_1.db.run("INSERT INTO oauth_access_tokens(user_id, access_token, expiry_date) VALUES(?,?,?)", [user_id, token, epoch_expiry], function (err) {
+    if (err) {
+      console.error(err);
+    }
+
+    console.log("Inserted access token with lastID " + this.lastID);
+  });
+};
+
+var insertUserRefreshToken = function (user_id, token) {
+  models_1.db.run("INSERT INTO oauth_refresh_tokens(user_id, refresh_token) VALUES(?,?)", [user_id, token], function (err) {
+    if (err) {
+      console.error(err);
+    }
+
+    console.log("Inserted refresh token with lastID " + this.lastID);
+  });
+};
 
 var authenticateUserToken = function (payload) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var tokens, userData, user_2;
+    var data, tokens, userData;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
+          data = null;
           return [4
           /*yield*/
           , client.getToken(payload.code)];
@@ -289,108 +242,48 @@ var authenticateUserToken = function (payload) {
           if (!userData.data.id) return [3
           /*break*/
           , 4];
-          user_2 = null;
           return [4
           /*yield*/
-          , getAsync('user').then(function (data) {
-            var users = [];
-            var uuid = uuid_1.v4();
+          , getOrInsertUser(userData.data.id).then(function (user) {
+            var hashedAccessToken = bcrypt.hashSync(tokens.access_token, 10);
+            insertUserAccessToken(user.id, hashedAccessToken, tokens.expiry_date);
+            var hashedRefreshToken = "";
 
-            if (data) {
-              users = JSON.parse(data);
-              user_2 = users.find(function (u) {
-                return u.google_id == userData.data.id;
-              });
+            if (tokens.refresh_token) {
+              hashedRefreshToken = bcrypt.hashSync(tokens.refresh_token, 10);
+              insertUserRefreshToken(user.id, hashedRefreshToken);
             }
 
-            if (!user_2) {
-              //user not found in db = add it
-              users.push({
-                id: uuid,
-                google_id: userData.data.id
-              });
-              models_1.db.set('user', JSON.stringify(users));
-              user_2 = {
-                id: uuid,
-                google_id: userData.data.id
-              };
-            }
-          })["catch"](function (err) {
-            console.log('no user table: ', err);
+            data = JSON.stringify({
+              access_token: jwt.sign({
+                access_token: hashedAccessToken
+              }, process.env.JWT_SALT, {
+                expiresIn: '3600s'
+              }),
+              refresh_token: hashedRefreshToken
+            });
           })];
 
         case 3:
           _a.sent();
 
-          return [2
-          /*return*/
-          , JSON.stringify({
-            id: user_2.id,
-            access_token: jwt.sign({
-              access_token: bcrypt.hashSync(tokens.access_token, 10)
-            }, process.env.JWT_SALT, {
-              expiresIn: '3600s'
-            }),
-            refresh_token: tokens.refresh_token ? bcrypt.hashSync(tokens.refresh_token, 10) : ''
-          })];
+          return [3
+          /*break*/
+          , 5];
 
         case 4:
           return [2
           /*return*/
-          ];
+          , null];
+
+        case 5:
+          return [2
+          /*return*/
+          , data];
       }
     });
   });
 };
 
 exports.authenticateUserToken = authenticateUserToken;
-
-var getLoggedUser = function (ctx) {
-  return __awaiter(void 0, void 0, void 0, function () {
-    var reqUserId_1, user_3, statusCode;
-    return __generator(this, function (_a) {
-      switch (_a.label) {
-        case 0:
-          if (!ctx.isAuthenticated()) return [3
-          /*break*/
-          , 2];
-          reqUserId_1 = ctx.req.user.id;
-          user_3 = null;
-          return [4
-          /*yield*/
-          , getAsync('usersMockDatabase').then(function (users) {
-            user_3 = JSON.parse(users).find(function (currUser) {
-              return currUser.id === reqUserId_1;
-            });
-          })];
-
-        case 1:
-          _a.sent();
-
-          if (user_3) {
-            delete user_3.password;
-            ctx.response.body = user_3;
-          } else {
-            statusCode = 500;
-            ctx["throw"](statusCode, "User doesn't exist");
-          }
-
-          return [3
-          /*break*/
-          , 3];
-
-        case 2:
-          ctx.redirect('/');
-          _a.label = 3;
-
-        case 3:
-          return [2
-          /*return*/
-          ];
-      }
-    });
-  });
-};
-
-exports.getLoggedUser = getLoggedUser;
 //# sourceMappingURL=auth.js.map
