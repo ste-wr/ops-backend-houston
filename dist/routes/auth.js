@@ -152,7 +152,27 @@ var auth_1 = require("../controllers/auth");
 var router = new Router({
   prefix: '/auth'
 });
-router
+router.get('/login', function (ctx) {
+  return __awaiter(void 0, void 0, void 0, function () {
+    var url;
+    return __generator(this, function (_a) {
+      switch (_a.label) {
+        case 0:
+          return [4
+          /*yield*/
+          , auth_1.generateGoogleAuthURL(ctx)];
+
+        case 1:
+          url = _a.sent();
+          ctx.status = 200;
+          ctx.body = url;
+          return [2
+          /*return*/
+          , ctx];
+      }
+    });
+  });
+})
 /* Handle Oauth Login */
 .post('/google', function (ctx) {
   return __awaiter(void 0, void 0, void 0, function () {
@@ -162,7 +182,7 @@ router
         case 0:
           return [4
           /*yield*/
-          , auth_1.authenticateUserToken(ctx.request.body)];
+          , auth_1.authenticateUserToken(ctx)];
 
         case 1:
           data = _a.sent();

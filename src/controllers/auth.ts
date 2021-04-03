@@ -4,7 +4,7 @@ const google = require('googleapis').google
 const jwt = require('jsonwebtoken')
 import { db } from '../models'
 
-const client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage')
+const client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_CALLBACK_URL, 'postmessage')
 const oauth2 = google.oauth2({
     auth: client,
     version: 'v2'
@@ -72,10 +72,34 @@ const insertUserRefreshToken = (user_id, token) => {
     })
 }
 
-const authenticateUserToken = async (payload) => {
+const generateGoogleAuthURL = async (ctx) => {
+    let payload = {
+        access_type: 'offline',
+        scope: 'https://www.googleapis.com/auth/userinfo.profile',
+    }
+    if(!ctx.cookies.get('__htsn_refresh_token'))
+    {
+        payload['prompt'] = 'consent'
+    }
+    const url = await client.generateAuthUrl(payload)
+    return url
+}
+
+const authenticateUserToken = async (ctx) => {
+    const payload = ctx.request.body
+    const existingRefreshToken = ctx.cookies.get('__hstn_refresh_token')
     let data = null
     const {tokens} = await client.getToken(payload.code)
     client.setCredentials(tokens)
+
+    // if there is no existing refresh token (cookie-based), and if there's no refresh token in the tokens object,
+    // then we assume that this user has an existing refresh token for a different machine.  In this case, request a
+    // new refresh token from google and store it for this client
+
+    if(!existingRefreshToken && !tokens.refresh_token) {
+
+    }
+
     // some documentation:
     // if we assume that this is the first time we receive the authentication, we will have both the 
     // access token and the refresh token.  We then need to do two things:
@@ -103,5 +127,6 @@ const authenticateUserToken = async (payload) => {
 }
 
 export {
-    authenticateUserToken
+    authenticateUserToken,
+    generateGoogleAuthURL
 }

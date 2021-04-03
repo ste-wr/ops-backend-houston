@@ -142,7 +142,7 @@ var __generator = this && this.__generator || function (thisArg, body) {
 };
 
 exports.__esModule = true;
-exports.authenticateUserToken = void 0;
+exports.generateGoogleAuthURL = exports.authenticateUserToken = void 0;
 
 var passport = require("koa-passport");
 
@@ -154,7 +154,7 @@ var jwt = require('jsonwebtoken');
 
 var models_1 = require("../models");
 
-var client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, 'postmessage');
+var client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_CALLBACK_URL, 'postmessage');
 var oauth2 = google.oauth2({
   auth: client,
   version: 'v2'
@@ -219,12 +219,45 @@ var insertUserRefreshToken = function (user_id, token) {
   });
 };
 
-var authenticateUserToken = function (payload) {
+var generateGoogleAuthURL = function (ctx) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var data, tokens, userData;
+    var payload, url;
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
+          payload = {
+            access_type: 'offline',
+            scope: 'https://www.googleapis.com/auth/userinfo.profile'
+          };
+
+          if (!ctx.cookies.get('__htsn_refresh_token')) {
+            payload['prompt'] = 'consent';
+          }
+
+          return [4
+          /*yield*/
+          , client.generateAuthUrl(payload)];
+
+        case 1:
+          url = _a.sent();
+          return [2
+          /*return*/
+          , url];
+      }
+    });
+  });
+};
+
+exports.generateGoogleAuthURL = generateGoogleAuthURL;
+
+var authenticateUserToken = function (ctx) {
+  return __awaiter(void 0, void 0, void 0, function () {
+    var payload, existingRefreshToken, data, tokens, userData;
+    return __generator(this, function (_a) {
+      switch (_a.label) {
+        case 0:
+          payload = ctx.request.body;
+          existingRefreshToken = ctx.cookies.get('__hstn_refresh_token');
           data = null;
           return [4
           /*yield*/
@@ -232,7 +265,12 @@ var authenticateUserToken = function (payload) {
 
         case 1:
           tokens = _a.sent().tokens;
-          client.setCredentials(tokens);
+          client.setCredentials(tokens); // if there is no existing refresh token (cookie-based), and if there's no refresh token in the tokens object,
+          // then we assume that this user has an existing refresh token for a different machine.  In this case, request a
+          // new refresh token from google and store it for this client
+
+          if (!existingRefreshToken && !tokens.refresh_token) {}
+
           return [4
           /*yield*/
           , oauth2.userinfo.get()];
