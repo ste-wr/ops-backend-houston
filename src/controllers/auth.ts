@@ -86,7 +86,7 @@ const generateGoogleAuthURL = async (ctx) => {
 }
 
 const authenticateUserToken = async (ctx) => {
-    const payload = ctx.request.body
+    const payload = ctx.request.query
     const existingRefreshToken = ctx.cookies.get('__hstn_refresh_token')
     let data = null
     const {tokens} = await client.getToken(payload.code)

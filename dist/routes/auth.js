@@ -172,9 +172,7 @@ router.get('/login', function (ctx) {
       }
     });
   });
-})
-/* Handle Oauth Login */
-.post('/google', function (ctx) {
+}).get('/google/callback', function (ctx) {
   return __awaiter(void 0, void 0, void 0, function () {
     var data, tokenData;
     return __generator(this, function (_a) {
@@ -189,13 +187,27 @@ router.get('/login', function (ctx) {
           tokenData = JSON.parse(data);
 
           if (tokenData.refresh_token !== '') {
-            ctx.set('Set-Cookie', ["__hstn_access_token=" + tokenData.access_token + "; HttpOnly", "__hstn_refresh_token=" + tokenData.refresh_token + "; HttpOnly"]);
+            //ctx.set('Set-Cookie', [`__hstn_refresh_token=${tokenData.refresh_token}; HttpOnly; Path=/`, `__hstn_access_token=${tokenData.access_token}; HttpOnly; Path=/`])
+            ctx.cookies.set('__hstn_access_token', tokenData.access_token, {
+              httpOnly: false,
+              path: '/',
+              secure: false
+            });
+            ctx.cookies.set('__hstn_refresh_token', tokenData.refresh_token, {
+              httpOnly: true,
+              path: '/',
+              secure: false
+            });
           } else {
-            ctx.set('Set-Cookie', ["__hstn_access_token=" + tokenData.access_token + "; HttpOnly"]);
+            //ctx.set('Set-Cookie', [`__hstn_access_token=${tokenData.access_token}; HttpOnly; Path=/`])
+            ctx.cookies.set('__hstn_access_token', tokenData.access_token, {
+              httpOnly: false,
+              path: '/',
+              secure: false
+            });
           }
 
-          ctx.status = 200;
-          ctx.body = 'accepted';
+          ctx.redirect(ctx.cookies.get('__hstn_auth_origin'));
           return [2
           /*return*/
           , ctx];

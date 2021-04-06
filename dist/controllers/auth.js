@@ -256,7 +256,7 @@ var authenticateUserToken = function (ctx) {
     return __generator(this, function (_a) {
       switch (_a.label) {
         case 0:
-          payload = ctx.request.body;
+          payload = ctx.request.query;
           existingRefreshToken = ctx.cookies.get('__hstn_refresh_token');
           data = null;
           return [4

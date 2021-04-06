@@ -10,22 +10,32 @@ const router = new Router({prefix: '/auth'})
 router
     .get('/login', async (ctx) => {
         const url = await generateGoogleAuthURL(ctx)
-        console.log(url)
         ctx.status = 200
         ctx.body = url
         return ctx
     })
-    /* Handle Oauth Login */
-    .post('/google', async (ctx) => {
+    .get('/google/callback', async(ctx) => {
         const data = await authenticateUserToken(ctx)
         const tokenData = JSON.parse(data)
         if(tokenData.refresh_token !== '') {
-            ctx.set('Set-Cookie', [`__hstn_access_token=${tokenData.access_token}; HttpOnly`, `__hstn_refresh_token=${tokenData.refresh_token}; HttpOnly`])
+            ctx.cookies.set('__hstn_access_token', tokenData.access_token, {
+                httpOnly: false,
+                path: '/',
+                secure: false
+            })
+            ctx.cookies.set('__hstn_refresh_token', tokenData.refresh_token, {
+                httpOnly: true,
+                path: '/',
+                secure: false
+            })
         } else {
-            ctx.set('Set-Cookie', [`__hstn_access_token=${tokenData.access_token}; HttpOnly`])
+            ctx.cookies.set('__hstn_access_token', tokenData.access_token, {
+                httpOnly: false,
+                path: '/',
+                secure: false
+            })
         }
-        ctx.status = 200
-        ctx.body = 'accepted'
+        ctx.redirect(ctx.cookies.get('__hstn_auth_origin'))
         return ctx
     })
 
