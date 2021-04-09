@@ -163,6 +163,8 @@ var db = require("./models");
 
 var auth_1 = require("./routes/auth");
 
+var system_1 = require("./routes/system");
+
 var app = new Koa();
 
 var init = function () {
@@ -227,6 +229,8 @@ var init = function () {
       app.use(passport.session());
       app.use(auth_1["default"].routes());
       app.use(auth_1["default"].allowedMethods());
+      app.use(system_1["default"].routes());
+      app.use(system_1["default"].allowedMethods());
 
       if (module.children) {
         app.listen(process.env.PORT || 3000);

@@ -9,6 +9,7 @@ import * as passport from 'koa-passport'
 
 import * as db from './models'
 import authRoutes from './routes/auth'
+import systemRoutes from './routes/system'
 
 const app = new Koa()
 
@@ -47,6 +48,8 @@ const init = async () => {
     app.use(passport.session())
     app.use(authRoutes.routes())
     app.use(authRoutes.allowedMethods())
+    app.use(systemRoutes.routes())
+    app.use(systemRoutes.allowedMethods())
     if(module.children) {
         app.listen(process.env.PORT || 3000)
         console.log('App listening on port 3000')
