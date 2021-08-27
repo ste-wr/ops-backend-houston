@@ -143,75 +143,21 @@ var __generator = this && this.__generator || function (thisArg, body) {
 
 exports.__esModule = true;
 
-var Router = require("@koa/router"); // need to initialize the local auth strategy
-// in controllers/auth.ts
-
-
-var auth_1 = require("../controllers/auth");
+var Router = require("@koa/router");
 
 var router = new Router({
-  prefix: '/auth'
+  prefix: '/system'
 });
-router.get('/login', function (ctx) {
+router.get('/dashboard', function (ctx) {
   return __awaiter(void 0, void 0, void 0, function () {
-    var url;
     return __generator(this, function (_a) {
-      switch (_a.label) {
-        case 0:
-          return [4
-          /*yield*/
-          , auth_1.generateGoogleAuthURL(ctx)];
-
-        case 1:
-          url = _a.sent();
-          ctx.status = 200;
-          ctx.body = url;
-          return [2
-          /*return*/
-          , ctx];
-      }
-    });
-  });
-}).get('/google/callback', function (ctx) {
-  return __awaiter(void 0, void 0, void 0, function () {
-    var data, tokenData;
-    return __generator(this, function (_a) {
-      switch (_a.label) {
-        case 0:
-          return [4
-          /*yield*/
-          , auth_1.authenticateUserToken(ctx)];
-
-        case 1:
-          data = _a.sent();
-          tokenData = JSON.parse(data);
-
-          if (tokenData.refresh_token !== '') {
-            ctx.cookies.set('__hstn_access_token', tokenData.access_token, {
-              httpOnly: false,
-              path: '/',
-              secure: false
-            });
-            ctx.cookies.set('__hstn_refresh_token', tokenData.refresh_token, {
-              httpOnly: true,
-              path: '/',
-              secure: false
-            });
-          } else {
-            ctx.cookies.set('__hstn_access_token', tokenData.access_token, {
-              httpOnly: false,
-              path: '/',
-              secure: false
-            });
-          }
-
-          ctx.redirect(ctx.cookies.get('__hstn_auth_origin'));
-          return [2
-          /*return*/
-          , ctx];
-      }
+      ctx.status = 200;
+      ctx.body = 'this is fine';
+      return [2
+      /*return*/
+      , ctx];
     });
   });
 });
 exports["default"] = router;
-//# sourceMappingURL=auth.js.map
+//# sourceMappingURL=system.js.map
